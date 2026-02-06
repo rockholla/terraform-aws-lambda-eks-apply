@@ -48,7 +48,7 @@ def handler(event, _context):
       rendered_manifest_file.write(rendered_manifest)
     logger.info("Applying the rendered manifest")
     kubectl_result = subprocess.run(
-      ['kubectl', '--kubeconfig', kubeconfig_path, 'apply', '-f', rendered_file_path],
+      ['./kubectl', '--kubeconfig', kubeconfig_path, 'apply', '-f', rendered_file_path],
       stdout=subprocess.PIPE,
       stderr=subprocess.STDOUT,
       text=True,

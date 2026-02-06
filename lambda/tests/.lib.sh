@@ -55,7 +55,7 @@ function run_tests_container() {
 }
 
 function test_container_kubectl() {
-  docker exec -i -w /tests "${TESTS_NAME}" kubectl --kubeconfig "${IN_TESTS_CONTAINER_KUBECONFIG_PATH}" "$@"
+  docker exec -i -w /tests "${TESTS_NAME}" /var/task/kubectl --kubeconfig "${IN_TESTS_CONTAINER_KUBECONFIG_PATH}" "$@"
 }
 
 function start_test_section() {

@@ -19,3 +19,11 @@ spec:
         image: "{{ nginx_deployment_image }}"
         ports:
         - containerPort: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "{{ nginx_deployment_name }}"
+data:
+  DEPLOYMENT_SECRET: "{{ deployment_secret }}"
+

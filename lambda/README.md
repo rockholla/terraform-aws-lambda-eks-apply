@@ -1,6 +1,6 @@
-# Container Image for use in Lambda for Applying a Templated Kubernetes Manifest to an EKS Cluster
+# Lambda Function for Applying a Templated Kubernetes Manifest to an EKS Cluster
 
-This directory contains the source for the [container image to be use by AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/images-create.html) in the top-level Terraform module. You can use this image directly without using the module as well.
+This directory contains the source for the AWS Lambda to generically apply Kubernetes manifests to an EKS cluster, used primarily by the top-level Terraform module. You can use this function or its image directly without using the module as well.
 
 ## Inputs to the AWS Lambda function
 

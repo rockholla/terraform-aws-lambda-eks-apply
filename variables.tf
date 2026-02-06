@@ -4,15 +4,20 @@ variable "region" {
   default     = null
 }
 
-variable "eks_cluster_name" {
-  description = "The name of the EKS cluster where the Lambda will apply the manifest"
-  type        = string
+variable "eks_cluster" {
+  description = "The config for the created/existing EKS cluster"
+  type = object({
+    name                = string
+    ca_certificate_data = string
+    endpoint            = string
+    token               = string
+  })
 }
 
-variable "lambda_image" {
-  description = "The container image to use for running the Lambda"
+variable "lambda_ecr_image" {
+  description = "The ECR image to use for running the lambda, you can pull this default image into your own private repos or modify it as you see fit for your needs"
   type        = string
-  default     = "rockholla/lambda-eks-apply:latest"
+  default     = "public.ecr.aws/i0p7z3n9/rockholla/lambda-eks-apply:latest"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {

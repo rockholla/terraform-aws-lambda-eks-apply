@@ -1,42 +1,34 @@
-data "aws_availability_zones" "available" {
-  filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
-  }
+locals {
+  name = "alambeksa-example-dyn"
 }
 
-locals {
-  name               = "alambeksa-example-dyn"
-  kubernetes_version = "1.34"
-  vpc_cidr = "10.0.0.0/16"
-  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+data "aws_availability_zones" "available" {
+  for_each = toset(var.supported_regions)
+  region   = each.key
 }
 
 module "vpc" {
   for_each = toset(var.supported_regions)
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 6.0"
+  source   = "terraform-aws-modules/vpc/aws"
+  version  = "~> 6.0"
 
   region = each.key
-  name = local.name
-  cidr = local.vpc_cidr
+  name   = local.name
+  cidr   = "10.0.0.0/16"
 
-  azs             = local.azs
-  private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
-  public_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
-
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  azs             = slice(data.aws_availability_zones.available[each.key].names, 0, 3)
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 }
 
 module "eks" {
   for_each = toset(var.supported_regions)
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 21.15.1"
+  source   = "terraform-aws-modules/eks/aws"
+  version  = "~> 21.15.1"
 
-  region = each.key
+  region                 = each.key
   name                   = local.name
-  kubernetes_version     = local.kubernetes_version
+  kubernetes_version     = "1.34"
   endpoint_public_access = true
 
   enable_cluster_creator_admin_permissions = true
@@ -46,15 +38,33 @@ module "eks" {
     node_pools = ["general-purpose"]
   }
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = module.vpc[each.key].vpc_id
+  subnet_ids = module.vpc[each.key].private_subnets
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  for_each = toset(var.supported_regions)
+  region   = each.key
+  name     = module.eks[each.key].cluster_name
 }
 
 module "lambda_eks_apply" {
   for_each = toset(var.supported_regions)
-  source = "../../"
+  source   = "../../"
 
   region = each.key
-  eks_cluster_name = module.eks[each.key].cluster_name
-
+  eks_cluster = {
+    name                = module.eks[each.key].cluster_name
+    ca_certificate_data = module.eks[each.key].cluster_certificate_authority_data
+    endpoint            = module.eks[each.key].cluster_endpoint
+    token               = data.aws_eks_cluster_auth.cluster[each.key].token
+  }
+  k8s_manifest_template = file("${path.module}/manifest.tmpl.yaml")
+  template_data = {
+    nginx_deployment_name  = "test-deployment"
+    nginx_deployment_image = "nginx:1.14.2"
+  }
+  template_secrets = {
+    deployment_secret = "bXktc2VjcmV0Cg=="
+  }
 }
