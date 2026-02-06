@@ -3,6 +3,8 @@
 
 This module wraps up some functionality to dynamically apply Kubernetes templated manifests to an EKS cluster via normal Terraform provisioning flows.
 
+We will build out these docs as we move forward, but see the [example directory](./examples/) for usage in the meantime.
+
 ## Requirements
 
 | Name | Version |
