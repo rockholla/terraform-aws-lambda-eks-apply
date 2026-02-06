@@ -1,0 +1,13 @@
+formatter: markdown
+content: |
+  {{ include ".terraform-docs-header.md" }}
+
+  {{ .Requirements }}
+
+  {{ .Modules }}
+
+  {{ .Resources }}
+
+  {{ .Inputs }}
+
+  {{ .Outputs }}
