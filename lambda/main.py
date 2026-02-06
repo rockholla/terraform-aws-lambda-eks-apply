@@ -15,6 +15,8 @@ def handler(event, _context):
   "Lambda handler to recieve cluster information and a manifest template to apply to the EKS cluster"
 
   kubectl_result = ""
+  kubeconfig_path = ""
+  rendered_file_path = ""
   try:
     token = secrets.get_aws_secret(event['cluster_token_secret_name'])
     cluster_connection_info = "endpoint: {}, ca: .......{}, token: *******{}".format(event["cluster_endpoint"], event['cluster_ca_certificate_data'][-5:], token[-5:])

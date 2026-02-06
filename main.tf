@@ -2,7 +2,8 @@ data "aws_region" "current" {}
 
 locals {
   region                    = var.region != null ? var.region : data.aws_region.current.region
-  cluster_token_secret_name = "${var.eks_cluster.name}-apply-manifest-token"
+  cluster_name = nonsensitive(var.eks_cluster.name)
+  cluster_token_secret_name = "${local.cluster_name}-apply-manifest-token"
   template_secrets_keys     = nonsensitive(keys(var.template_secrets))
 }
 
@@ -19,8 +20,8 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name        = "${var.eks_cluster.name}-${local.region}-apply-manifest-lambda"
-  description = "Role w/ permissions execute the Lambda to apply manifests to the EKS cluster ${var.eks_cluster.name}"
+  name        = "${local.cluster_name}-${local.region}-apply-manifest-lambda"
+  description = "Role w/ permissions execute the Lambda to apply manifests to the EKS cluster ${local.cluster_name}"
 
   assume_role_policy    = data.aws_iam_policy_document.lambda_assume_role.json
   permissions_boundary  = var.lambda_iam_role_permissions_boundary_arn
@@ -47,7 +48,7 @@ module "cluster_auth_secret" {
 
   region                  = local.region
   name_prefix             = local.cluster_token_secret_name
-  description             = "Temporary EKS cluster auth token for ${var.eks_cluster.name} cluster, for use by the Lambda EKS apply function"
+  description             = "Temporary EKS cluster auth token for ${local.cluster_name} cluster, for use by the Lambda EKS apply function"
   recovery_window_in_days = 30
   secret_string           = var.eks_cluster.token
 
@@ -63,7 +64,7 @@ module "template_secrets" {
 
   region                  = local.region
   name_prefix             = each.key
-  description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${var.eks_cluster.name}"
+  description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${local.cluster_name}"
   recovery_window_in_days = 30
   secret_string           = var.template_secrets[each.key]
 
@@ -75,9 +76,9 @@ module "template_secrets" {
 locals {
   template_data = merge(var.template_data, {
     cluster_ca_certificate_data = var.eks_cluster.ca_certificate_data
-    cluster_endpoint            = var.eks_cluster.endpoint
+    cluster_endpoint            = nonsensitive(var.eks_cluster.endpoint)
     cluster_token_secret_name   = module.cluster_auth_secret.secret_name
-    cluster_name                = var.eks_cluster.name
+    cluster_name                = local.cluster_name
     }, {
     secret_names = { for key, template_secret in module.template_secrets : key => template_secret.secret_name }
   })
@@ -94,7 +95,7 @@ resource "utility_file_downloader" "lambda_release" {
 
 resource "aws_lambda_function" "manifest_apply" {
   region        = local.region
-  function_name = "${var.eks_cluster.name}-apply-manifest"
+  function_name = "${local.cluster_name}-apply-manifest"
   timeout       = var.lambda_function_timeout
   architectures = ["x86_64"]
   filename      = utility_file_downloader.lambda_release.filename
