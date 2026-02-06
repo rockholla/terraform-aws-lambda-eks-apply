@@ -18,7 +18,7 @@ variable "eks_cluster" {
 variable "lambda_package_version" {
   description = "The version of the Lambda package/artifact released separately from this module at https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases"
   type        = string
-  default     = "v0.0.1-rc06"
+  default     = "v0.0.1-rc07"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
@@ -49,5 +49,11 @@ variable "template_secrets" {
   type        = map(string)
   sensitive   = true
   default     = {}
+}
+
+variable "force_apply" {
+  description = "Terraform and logic in this module will attempt to only re-invoke the manifest apply when necessary, you can use this switch to force reinvoke"
+  type        = bool
+  default     = false
 }
 

@@ -1,11 +1,15 @@
 data "aws_region" "current" {}
 
 locals {
-  secret_name_suffix               = "4eks9"
   region                           = var.region != null ? var.region : data.aws_region.current.region
   cluster_name                     = nonsensitive(var.eks_cluster.name)
-  cluster_token_secret_name_prefix = "${local.cluster_name}-a"
+  cluster_token_secret_name_prefix = "${local.cluster_name}-lambda-eks-apply-token-"
   template_secrets_keys            = nonsensitive(keys(var.template_secrets))
+  apply_trigger                    = var.force_apply ? timestamp() : base64encode("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
+}
+
+resource "terraform_data" "apply_trigger" {
+  triggers_replace = local.apply_trigger
 }
 
 data "aws_iam_policy_document" "lambda_assume_role" {
@@ -37,7 +41,8 @@ resource "aws_iam_role_policy_attachment" "lambda_role_basic_execution" {
 locals {
   secrets_policy_statements = {
     read = {
-      sid = "AllowReadFromLambdaEKSApplyIAMRole"
+      sid    = "AllowReadFromLambdaEKSApplyIAMRole"
+      effect = "Allow"
       principals = [{
         type        = "AWS"
         identifiers = [aws_iam_role.lambda.arn]
@@ -48,19 +53,59 @@ locals {
   }
 }
 
-module "cluster_auth_secret" {
-  source  = "terraform-aws-modules/secrets-manager/aws"
-  version = "2.1.0"
+resource "aws_secretsmanager_secret" "cluster_auth_secret" {
+  region = local.region
 
-  region                  = local.region
-  name                    = "${local.cluster_token_secret_name_prefix}-${local.secret_name_suffix}"
   description             = "Temporary EKS cluster auth token for ${local.cluster_name} cluster, for use by the Lambda EKS apply function"
+  name_prefix             = local.cluster_token_secret_name_prefix
   recovery_window_in_days = 30
-  secret_string           = var.eks_cluster.token
+}
 
-  create_policy       = true
+data "aws_iam_policy_document" "cluster_auth_secret" {
+  dynamic "statement" {
+    for_each = local.secrets_policy_statements
+
+    content {
+      sid       = statement.value.sid
+      actions   = statement.value.actions
+      effect    = statement.value.effect
+      resources = statement.value.resources
+
+      dynamic "principals" {
+        for_each = statement.value.principals != null ? statement.value.principals : []
+
+        content {
+          type        = principals.value.type
+          identifiers = principals.value.identifiers
+        }
+      }
+    }
+  }
+}
+
+resource "aws_secretsmanager_secret_policy" "cluster_auth_secret" {
+  region              = local.region
   block_public_policy = true
-  policy_statements   = local.secrets_policy_statements
+  policy              = data.aws_iam_policy_document.cluster_auth_secret.json
+  secret_arn          = aws_secretsmanager_secret.cluster_auth_secret.arn
+}
+
+resource "aws_secretsmanager_secret_version" "cluster_auth_secret" {
+  region        = local.region
+  secret_id     = aws_secretsmanager_secret.cluster_auth_secret.id
+  secret_string = var.eks_cluster.token
+
+  # all normal operations that change the secret_string will be ignored
+  # but the full resource will be replaced when an apply of the manifest
+  # needs to happen
+  lifecycle {
+    ignore_changes = [
+      secret_string
+    ]
+    replace_triggered_by = [
+      terraform_data.apply_trigger
+    ]
+  }
 }
 
 module "template_secrets" {
@@ -69,7 +114,7 @@ module "template_secrets" {
   version  = "2.1.0"
 
   region                  = local.region
-  name                    = "${each.key}-${local.secret_name_suffix}"
+  name_prefix             = "${each.key}-"
   description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${local.cluster_name}"
   recovery_window_in_days = 30
   secret_string           = var.template_secrets[each.key]
@@ -84,7 +129,7 @@ locals {
     manifest_template_base64    = base64encode(var.k8s_manifest_template)
     cluster_ca_certificate_data = var.eks_cluster.ca_certificate_data
     cluster_endpoint            = nonsensitive(var.eks_cluster.endpoint)
-    cluster_token_secret_name   = module.cluster_auth_secret.secret_name
+    cluster_token_secret_name   = aws_secretsmanager_secret.cluster_auth_secret.name
     cluster_name                = local.cluster_name
     }, {
     secret_names = { for key, template_secret in module.template_secrets : key => template_secret.secret_name }
@@ -136,5 +181,8 @@ resource "aws_lambda_invocation" "manifest_apply" {
       condition     = jsondecode(self.result).statusCode == 200
       error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
     }
+    replace_triggered_by = [
+      terraform_data.apply_trigger
+    ]
   }
 }
