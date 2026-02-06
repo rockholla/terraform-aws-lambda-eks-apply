@@ -1,10 +1,11 @@
 data "aws_region" "current" {}
 
 locals {
-  region                    = var.region != null ? var.region : data.aws_region.current.region
-  cluster_name = nonsensitive(var.eks_cluster.name)
-  cluster_token_secret_name = "${local.cluster_name}-apply-manifest-token"
-  template_secrets_keys     = nonsensitive(keys(var.template_secrets))
+  secret_name_suffix               = "4eks9"
+  region                           = var.region != null ? var.region : data.aws_region.current.region
+  cluster_name                     = nonsensitive(var.eks_cluster.name)
+  cluster_token_secret_name_prefix = "${local.cluster_name}-a"
+  template_secrets_keys            = nonsensitive(keys(var.template_secrets))
 }
 
 data "aws_iam_policy_document" "lambda_assume_role" {
@@ -28,6 +29,11 @@ resource "aws_iam_role" "lambda" {
   force_detach_policies = true
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_role_basic_execution" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
 locals {
   secrets_policy_statements = {
     read = {
@@ -47,7 +53,7 @@ module "cluster_auth_secret" {
   version = "2.1.0"
 
   region                  = local.region
-  name_prefix             = local.cluster_token_secret_name
+  name                    = "${local.cluster_token_secret_name_prefix}-${local.secret_name_suffix}"
   description             = "Temporary EKS cluster auth token for ${local.cluster_name} cluster, for use by the Lambda EKS apply function"
   recovery_window_in_days = 30
   secret_string           = var.eks_cluster.token
@@ -63,7 +69,7 @@ module "template_secrets" {
   version  = "2.1.0"
 
   region                  = local.region
-  name_prefix             = each.key
+  name                    = "${each.key}-${local.secret_name_suffix}"
   description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${local.cluster_name}"
   recovery_window_in_days = 30
   secret_string           = var.template_secrets[each.key]
@@ -75,6 +81,7 @@ module "template_secrets" {
 
 locals {
   template_data = merge(var.template_data, {
+    manifest_template_base64    = base64encode(var.k8s_manifest_template)
     cluster_ca_certificate_data = var.eks_cluster.ca_certificate_data
     cluster_endpoint            = nonsensitive(var.eks_cluster.endpoint)
     cluster_token_secret_name   = module.cluster_auth_secret.secret_name
@@ -93,6 +100,11 @@ resource "utility_file_downloader" "lambda_release" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "manifest_apply" {
+  name              = "/aws/lambda/${local.cluster_name}-apply-manifest"
+  retention_in_days = 5
+}
+
 resource "aws_lambda_function" "manifest_apply" {
   region        = local.region
   function_name = "${local.cluster_name}-apply-manifest"
@@ -103,6 +115,14 @@ resource "aws_lambda_function" "manifest_apply" {
   handler       = "main.handler"
 
   role = aws_iam_role.lambda.arn
+
+  logging_config {
+    log_format            = "JSON"
+    application_log_level = "INFO"
+    system_log_level      = "WARN"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.manifest_apply]
 }
 
 resource "aws_lambda_invocation" "manifest_apply" {
@@ -110,4 +130,11 @@ resource "aws_lambda_invocation" "manifest_apply" {
   function_name = aws_lambda_function.manifest_apply.function_name
 
   input = jsonencode(local.template_data)
+
+  lifecycle {
+    postcondition {
+      condition     = jsondecode(self.result).statusCode == 200
+      error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
+    }
+  }
 }

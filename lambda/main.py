@@ -40,7 +40,7 @@ def handler(event, _context):
       yaml.dump(kubeconfig, kubeconfig_file, default_flow_style=False)
 
     if 'secret_names' in event:
-      for key, secret_name in event.items():
+      for key, secret_name in event['secret_names'].items():
         logger.info("Getting secret: {}".format(secret_name))
         event[key] = secrets.get_aws_secret(secret_name)
     rendered_file_path = "/tmp/manifest.yaml"

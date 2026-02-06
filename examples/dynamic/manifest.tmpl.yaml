@@ -4,6 +4,7 @@ metadata:
   name: "{{ nginx_deployment_name }}"
   labels:
     app: nginx
+    version: "13"
 spec:
   replicas: 1
   selector:
