@@ -18,7 +18,7 @@ variable "eks_cluster" {
 variable "lambda_package_version" {
   description = "The version of the Lambda package/artifact released separately from this module at https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases"
   type        = string
-  default     = "v0.0.1-rc07"
+  default     = "v0.0.1"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
