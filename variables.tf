@@ -21,10 +21,13 @@ variable "lambda_package_version" {
   default     = "v0.0.1"
 }
 
-variable "lambda_package_download_location" {
-  description = "Location where the lambda package/artifact will be downloaded, defaults to path.cwd"
-  type        = string
-  default     = null
+variable "lambda_package_download" {
+  description = "Location  where the lambda package/artifact will be downloaded and name of the downloaded zip file, location defaults to path.cwd, name defaults to lambda-<version>"
+  type        = object({
+    path = optional(string, "")
+    name = optional(string, "")
+  })
+  default     = {}
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
