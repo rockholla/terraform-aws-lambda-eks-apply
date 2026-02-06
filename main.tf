@@ -1,9 +1,15 @@
 data "aws_region" "current" {}
 
 locals {
-  region                    = var.region != null ? var.region : data.aws_region.current.region
-  cluster_token_secret_name = "${var.eks_cluster.name}-apply-manifest-token"
-  template_secrets_keys     = nonsensitive(keys(var.template_secrets))
+  region                           = var.region != null ? var.region : data.aws_region.current.region
+  cluster_name                     = nonsensitive(var.eks_cluster.name)
+  cluster_token_secret_name_prefix = "${local.cluster_name}-lambda-eks-apply-token-"
+  template_secrets_keys            = nonsensitive(keys(var.template_secrets))
+  apply_trigger                    = var.force_apply ? timestamp() : base64encode("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
+}
+
+resource "terraform_data" "apply_trigger" {
+  triggers_replace = local.apply_trigger
 }
 
 data "aws_iam_policy_document" "lambda_assume_role" {
@@ -19,18 +25,24 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name        = "${var.eks_cluster.name}-${local.region}-apply-manifest-lambda"
-  description = "Role w/ permissions execute the Lambda to apply manifests to the EKS cluster ${var.eks_cluster.name}"
+  name        = "${local.cluster_name}-${local.region}-apply-manifest-lambda"
+  description = "Role w/ permissions execute the Lambda to apply manifests to the EKS cluster ${local.cluster_name}"
 
   assume_role_policy    = data.aws_iam_policy_document.lambda_assume_role.json
   permissions_boundary  = var.lambda_iam_role_permissions_boundary_arn
   force_detach_policies = true
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_role_basic_execution" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
 locals {
   secrets_policy_statements = {
     read = {
-      sid = "AllowReadFromLambdaEKSApplyIAMRole"
+      sid    = "AllowReadFromLambdaEKSApplyIAMRole"
+      effect = "Allow"
       principals = [{
         type        = "AWS"
         identifiers = [aws_iam_role.lambda.arn]
@@ -41,19 +53,59 @@ locals {
   }
 }
 
-module "cluster_auth_secret" {
-  source  = "terraform-aws-modules/secrets-manager/aws"
-  version = "2.1.0"
+resource "aws_secretsmanager_secret" "cluster_auth_secret" {
+  region = local.region
 
-  region                  = local.region
-  name                    = local.cluster_token_secret_name
-  description             = "Temporary EKS cluster auth token for ${var.eks_cluster.name} cluster, for use by the Lambda EKS apply function"
+  description             = "Temporary EKS cluster auth token for ${local.cluster_name} cluster, for use by the Lambda EKS apply function"
+  name_prefix             = local.cluster_token_secret_name_prefix
   recovery_window_in_days = 30
-  secret_string           = var.eks_cluster.token
+}
 
-  create_policy       = true
+data "aws_iam_policy_document" "cluster_auth_secret" {
+  dynamic "statement" {
+    for_each = local.secrets_policy_statements
+
+    content {
+      sid       = statement.value.sid
+      actions   = statement.value.actions
+      effect    = statement.value.effect
+      resources = statement.value.resources
+
+      dynamic "principals" {
+        for_each = statement.value.principals != null ? statement.value.principals : []
+
+        content {
+          type        = principals.value.type
+          identifiers = principals.value.identifiers
+        }
+      }
+    }
+  }
+}
+
+resource "aws_secretsmanager_secret_policy" "cluster_auth_secret" {
+  region              = local.region
   block_public_policy = true
-  policy_statements   = local.secrets_policy_statements
+  policy              = data.aws_iam_policy_document.cluster_auth_secret.json
+  secret_arn          = aws_secretsmanager_secret.cluster_auth_secret.arn
+}
+
+resource "aws_secretsmanager_secret_version" "cluster_auth_secret" {
+  region        = local.region
+  secret_id     = aws_secretsmanager_secret.cluster_auth_secret.id
+  secret_string = var.eks_cluster.token
+
+  # all normal operations that change the secret_string will be ignored
+  # but the full resource will be replaced when an apply of the manifest
+  # needs to happen
+  lifecycle {
+    ignore_changes = [
+      secret_string
+    ]
+    replace_triggered_by = [
+      terraform_data.apply_trigger
+    ]
+  }
 }
 
 module "template_secrets" {
@@ -62,8 +114,8 @@ module "template_secrets" {
   version  = "2.1.0"
 
   region                  = local.region
-  name                    = each.key
-  description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${var.eks_cluster.name}"
+  name_prefix             = "${each.key}-"
+  description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${local.cluster_name}"
   recovery_window_in_days = 30
   secret_string           = var.template_secrets[each.key]
 
@@ -74,28 +126,63 @@ module "template_secrets" {
 
 locals {
   template_data = merge(var.template_data, {
+    manifest_template_base64    = base64encode(var.k8s_manifest_template)
     cluster_ca_certificate_data = var.eks_cluster.ca_certificate_data
-    cluster_endpoint            = var.eks_cluster.endpoint
-    cluster_token_secret_name   = local.cluster_token_secret_name
-    cluster_name                = var.eks_cluster.name
+    cluster_endpoint            = nonsensitive(var.eks_cluster.endpoint)
+    cluster_token_secret_name   = aws_secretsmanager_secret.cluster_auth_secret.name
+    cluster_name                = local.cluster_name
     }, {
     secret_names = { for key, template_secret in module.template_secrets : key => template_secret.secret_name }
   })
 }
 
-# resource "aws_lambda_function" "manifest_apply" {
-#   region        = local.region
-#   function_name = "${var.eks_cluster.name}-apply-manifest"
-#   timeout       = var.lambda_function_timeout
-#   image_uri     = "${var.lambda_image.account}.dkr.ecr.${local.region}.amazonaws.com/${var.lam}"
-#   package_type  = "Image"
+resource "utility_file_downloader" "lambda_release" {
+  url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2F${var.lambda_package_version}/lambda-${var.lambda_package_version}.zip"
+  filename = "${path.cwd}/lambda-${var.lambda_package_version}.zip"
 
-#   role = aws_iam_role.lambda.arn
-# }
+  headers = {
+    Accept = "application/vnd.github+json"
+  }
+}
 
-# resource "aws_lambda_invocation" "manifest_apply" {
-#   region        = local.region
-#   function_name = aws_lambda_function.manifest_apply.function_name
+resource "aws_cloudwatch_log_group" "manifest_apply" {
+  name              = "/aws/lambda/${local.cluster_name}-apply-manifest"
+  retention_in_days = 5
+}
 
-#   input = jsonencode(local.template_data)
-# }
+resource "aws_lambda_function" "manifest_apply" {
+  region        = local.region
+  function_name = "${local.cluster_name}-apply-manifest"
+  timeout       = var.lambda_function_timeout
+  architectures = ["x86_64"]
+  filename      = utility_file_downloader.lambda_release.filename
+  runtime       = "python3.14"
+  handler       = "main.handler"
+
+  role = aws_iam_role.lambda.arn
+
+  logging_config {
+    log_format            = "JSON"
+    application_log_level = "INFO"
+    system_log_level      = "WARN"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.manifest_apply]
+}
+
+resource "aws_lambda_invocation" "manifest_apply" {
+  region        = local.region
+  function_name = aws_lambda_function.manifest_apply.function_name
+
+  input = jsonencode(local.template_data)
+
+  lifecycle {
+    postcondition {
+      condition     = jsondecode(self.result).statusCode == 200
+      error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
+    }
+    replace_triggered_by = [
+      terraform_data.apply_trigger
+    ]
+  }
+}

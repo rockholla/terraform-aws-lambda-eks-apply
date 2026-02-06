@@ -12,12 +12,13 @@ variable "eks_cluster" {
     endpoint            = string
     token               = string
   })
+  sensitive = true
 }
 
-variable "lambda_ecr_image" {
-  description = "The ECR image to use for running the lambda, you can pull this default image into your own private repos or modify it as you see fit for your needs"
+variable "lambda_package_version" {
+  description = "The version of the Lambda package/artifact released separately from this module at https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases"
   type        = string
-  default     = "public.ecr.aws/i0p7z3n9/rockholla/lambda-eks-apply:latest"
+  default     = "v0.0.1-rc07"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
@@ -48,5 +49,11 @@ variable "template_secrets" {
   type        = map(string)
   sensitive   = true
   default     = {}
+}
+
+variable "force_apply" {
+  description = "Terraform and logic in this module will attempt to only re-invoke the manifest apply when necessary, you can use this switch to force reinvoke"
+  type        = bool
+  default     = false
 }
 

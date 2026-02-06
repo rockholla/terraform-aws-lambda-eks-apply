@@ -15,6 +15,8 @@ def handler(event, _context):
   "Lambda handler to recieve cluster information and a manifest template to apply to the EKS cluster"
 
   kubectl_result = ""
+  kubeconfig_path = ""
+  rendered_file_path = ""
   try:
     token = secrets.get_aws_secret(event['cluster_token_secret_name'])
     cluster_connection_info = "endpoint: {}, ca: .......{}, token: *******{}".format(event["cluster_endpoint"], event['cluster_ca_certificate_data'][-5:], token[-5:])
@@ -38,7 +40,7 @@ def handler(event, _context):
       yaml.dump(kubeconfig, kubeconfig_file, default_flow_style=False)
 
     if 'secret_names' in event:
-      for key, secret_name in event.items():
+      for key, secret_name in event['secret_names'].items():
         logger.info("Getting secret: {}".format(secret_name))
         event[key] = secrets.get_aws_secret(secret_name)
     rendered_file_path = "/tmp/manifest.yaml"

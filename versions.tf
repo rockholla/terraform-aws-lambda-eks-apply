@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 6.28"
     }
+    utility = {
+      source  = "frontiersgg/utility"
+      version = "0.3.0"
+    }
   }
 
   provider_meta "aws" {
