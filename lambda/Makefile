@@ -9,10 +9,11 @@ test:
 .PHONY: build
 build:
 	./scripts/download-kubectl.sh
-	mkdir -p .dist
+	rm -rf .dist || true
+	mkdir .dist
 	cp *.py .dist/
 	cp requirements.txt .dist/
-	cd .dist && pip3 install -r requirements.txt -t python/ && cd ../
+	cd .dist && pip3 install -r requirements.txt -t . && cd ../
 	cp README.md .dist/
 	cp scripts/kubectl .dist/
 	cd .dist && zip -r ../lambda.zip .

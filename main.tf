@@ -84,11 +84,11 @@ locals {
 }
 
 locals {
-  lambda_zip_filename = "${path.module}/lambda-${var.lambda_package_version}.zip"
+  lambda_zip_filename = "${path.cwd}/lambda-${var.lambda_package_version}.zip"
 }
 
 resource "utility_file_downloader" "lambda_release" {
-  url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2Fv0.0.1-rc02/lambda-${var.lambda_package_version}.zip"
+  url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2F${var.lambda_package_version}/lambda-${var.lambda_package_version}.zip"
   filename = local.lambda_zip_filename
 
   headers = {
