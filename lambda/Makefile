@@ -12,6 +12,7 @@ build:
 	mkdir -p .dist
 	cp *.py .dist/
 	cp requirements.txt .dist/
+	cd .dist && pip3 install -r requirements.txt -t python/ && cd ../
 	cp README.md .dist/
 	cp scripts/kubectl .dist/
 	cd .dist && zip -r ../lambda.zip .
