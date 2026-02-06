@@ -3,3 +3,9 @@ variable "supported_regions" {
   type        = list(string)
   default     = ["us-west-2"]
 }
+
+variable "force_apply" {
+  description = "pass through to the module force_apply"
+  type        = bool
+  default     = false
+}
