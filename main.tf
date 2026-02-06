@@ -145,14 +145,18 @@ resource "utility_file_downloader" "lambda_release" {
   }
 }
 
+locals {
+  lambda_function_name = "${local.cluster_name}-${local.region}-apply-manifest"
+}
+
 resource "aws_cloudwatch_log_group" "manifest_apply" {
-  name              = "/aws/lambda/${local.cluster_name}-apply-manifest"
+  name              = "/aws/lambda/${local.lambda_function_name}"
   retention_in_days = 5
 }
 
 resource "aws_lambda_function" "manifest_apply" {
   region        = local.region
-  function_name = "${local.cluster_name}-apply-manifest"
+  function_name = local.lambda_function_name
   timeout       = var.lambda_function_timeout
   architectures = ["x86_64"]
   filename      = utility_file_downloader.lambda_release.filename
