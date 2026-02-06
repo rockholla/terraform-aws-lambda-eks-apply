@@ -83,13 +83,9 @@ locals {
   })
 }
 
-locals {
-  lambda_zip_filename = "${path.cwd}/lambda-${var.lambda_package_version}.zip"
-}
-
 resource "utility_file_downloader" "lambda_release" {
   url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2F${var.lambda_package_version}/lambda-${var.lambda_package_version}.zip"
-  filename = local.lambda_zip_filename
+  filename = "${path.cwd}/lambda-${var.lambda_package_version}.zip"
 
   headers = {
     Accept = "application/vnd.github+json"
@@ -101,7 +97,7 @@ resource "aws_lambda_function" "manifest_apply" {
   function_name = "${var.eks_cluster.name}-apply-manifest"
   timeout       = var.lambda_function_timeout
   architectures = ["x86_64"]
-  filename      = local.lambda_zip_filename
+  filename      = utility_file_downloader.lambda_release.filename
   runtime       = "python3.14"
   handler       = "main.handler"
 
