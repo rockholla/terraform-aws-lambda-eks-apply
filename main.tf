@@ -136,9 +136,13 @@ locals {
   })
 }
 
+locals {
+  lambda_package_download_location = var.lambda_package_download_location != null ? var.lambda_package_download_location : path.cwd
+}
+
 resource "utility_file_downloader" "lambda_release" {
   url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2F${var.lambda_package_version}/lambda-${var.lambda_package_version}.zip"
-  filename = "${path.cwd}/lambda-${var.lambda_package_version}.zip"
+  filename = "${local.lambda_package_download_location}/lambda-${var.lambda_package_version}.zip"
 
   headers = {
     Accept = "application/vnd.github+json"

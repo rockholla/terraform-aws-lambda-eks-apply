@@ -21,6 +21,12 @@ variable "lambda_package_version" {
   default     = "v0.0.1"
 }
 
+variable "lambda_package_download_location" {
+  description = "Location where the lambda package/artifact will be downloaded, defaults to path.cwd"
+  type        = string
+  default     = null
+}
+
 variable "lambda_iam_role_permissions_boundary_arn" {
   description = "Optional permissions boundary policy ARN to set on the IAM role managed by this module to execute the Lambda"
   type        = string
