@@ -151,6 +151,11 @@ resource "aws_s3_object_copy" "lambda_package" {
   bucket = aws_s3_bucket.lambda_package.id
   key    = local.lambda_package_s3_key
   source = "rockholla-terraform-aws-lambda-eks-apply/lambda-releases/${local.lambda_package_s3_key}"
+  override_provider {
+    default_tags {
+      tags = {}
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "manifest_apply" {
