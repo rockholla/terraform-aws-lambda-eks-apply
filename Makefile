@@ -34,5 +34,9 @@ ops-container:
 		docker run -i -d -v "$$(pwd):/workdir" -w /workdir --name $(OPS_CONTAINER_NAME) $(OPS_IMAGE_NAME) -c "tail -f /dev/null"; \
 	fi;
 
-
+.PHONY: clean
+clean:
+	find . -name *.zip -exec rm {} \;
+	find . -name .terraform -type d -exec rm -rf {} \;
+	find . -name .terraform.lock.hcl -type f -exec rm {} \;
 

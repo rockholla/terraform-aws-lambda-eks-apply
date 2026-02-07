@@ -89,3 +89,7 @@ module "lambda_eks_apply" {
   force_apply = var.force_apply
 }
 
+output "apply_logs" {
+  value = { for region, result in module.lambda_eks_apply : region => result.invocation_log }
+}
+
