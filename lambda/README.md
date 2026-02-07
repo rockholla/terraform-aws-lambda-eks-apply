@@ -14,6 +14,10 @@ This directory contains the source for the AWS Lambda to generically apply Kuber
 * `cluster_token_secret_name`: The AWS secrets manager secret name, storing a temporary token to authenticate to the cluster
 * `manifest_template_base64`: The string (base64 encoded) that is a YAML manifest to apply, optionally templated via Jinja2
 
+### Optional Common Inputs
+
+* `kubectl_operation`: by default, this is `apply`, but anything that could work like `kubectl <operation> -f <resulting template file>` you could provide instead of `apply`, e.g. `delete`
+
 ### Other inputs provided to the lambda function can be used as top-level Jinja2 template values as defined in the above `manifest_template_base64`. For example
 
 If I pass the following additional values as inputs to the lambda function:
