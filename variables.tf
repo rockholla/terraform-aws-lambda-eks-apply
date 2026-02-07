@@ -16,18 +16,9 @@ variable "eks_cluster" {
 }
 
 variable "lambda_package_version" {
-  description = "The version of the Lambda package/artifact released separately from this module at https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases"
+  description = "The version of the Lambda function (https://github.com/rockholla/terraform-aws-lambda-eks-apply/tree/main/lambda) package/artifact released separately from this module to Github releases/S3 for use by this module"
   type        = string
-  default     = "v0.0.2-rc01"
-}
-
-variable "lambda_package_download" {
-  description = "Location  where the lambda package/artifact will be downloaded and name of the downloaded zip file, location defaults to path.cwd, name defaults to lambda-<version>"
-  type = object({
-    path = optional(string, "")
-    name = optional(string, "")
-  })
-  default = {}
+  default     = "v0.0.2"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
