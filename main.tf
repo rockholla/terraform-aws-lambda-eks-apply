@@ -5,7 +5,7 @@ locals {
   cluster_name                     = nonsensitive(var.eks_cluster.name)
   cluster_token_secret_name_prefix = "${local.cluster_name}-lambda-eks-apply-token-"
   template_secrets_keys            = nonsensitive(keys(var.template_secrets))
-  apply_trigger                    = var.force_apply ? timestamp() : base64encode("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
+  apply_trigger                    = var.force_apply || var.delete_manifest ? timestamp() : base64encode("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
 }
 
 resource "terraform_data" "apply_trigger" {
@@ -130,6 +130,7 @@ locals {
     cluster_endpoint            = nonsensitive(var.eks_cluster.endpoint)
     cluster_token_secret_name   = aws_secretsmanager_secret.cluster_auth_secret.name
     cluster_name                = local.cluster_name
+    kubectl_operation           = var.delete_manifest ? "delete" : "apply"
     }, {
     secret_names = { for key, template_secret in module.template_secrets : key => template_secret.secret_name }
   })

@@ -9,3 +9,9 @@ variable "force_apply" {
   type        = bool
   default     = false
 }
+
+variable "delete_manifest" {
+  description = "If we want to remove the manifest, kubectl delete instead of kubectl apply"
+  type        = bool
+  default     = false
+}
