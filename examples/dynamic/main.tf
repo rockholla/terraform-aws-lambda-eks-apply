@@ -86,7 +86,8 @@ module "lambda_eks_apply" {
   template_secrets = {
     deployment_secret = "bXktc2VjcmV0Cg=="
   }
-  force_apply = var.force_apply
+  force_apply     = var.force_apply
+  delete_manifest = var.delete_manifest
 }
 
 output "apply_logs" {

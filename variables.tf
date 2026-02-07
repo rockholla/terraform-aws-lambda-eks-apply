@@ -18,7 +18,7 @@ variable "eks_cluster" {
 variable "lambda_package_version" {
   description = "The version of the Lambda function (https://github.com/rockholla/terraform-aws-lambda-eks-apply/tree/main/lambda) package/artifact released separately from this module to Github releases/S3 for use by this module"
   type        = string
-  default     = "v0.0.2"
+  default     = "v0.0.3"
 }
 
 variable "lambda_iam_role_permissions_boundary_arn" {
@@ -53,6 +53,12 @@ variable "template_secrets" {
 
 variable "force_apply" {
   description = "Terraform and logic in this module will attempt to only re-invoke the manifest apply when necessary, you can use this switch to force reinvoke"
+  type        = bool
+  default     = false
+}
+
+variable "delete_manifest" {
+  description = "By default, the manifest will be kubectl applied via the Lambda, set this to run a kubectl delete instead"
   type        = bool
   default     = false
 }
