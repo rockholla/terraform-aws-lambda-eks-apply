@@ -33,7 +33,8 @@ release: build
 	if gh release view lambda/$(version) --repo rockholla/terraform-aws-lambda-eks-apply; then echo "error: release/tag $(version) already exists"; exit 1; fi;
 	gh release create lambda/$(version) --notes "$(description)" --title lambda/$(version) --latest=$(latest) $(prerelease_arg) && \
 	mv lambda.zip lambda-$(version).zip && \
-	gh release upload lambda/$(version) lambda-$(version).zip;
+	gh release upload lambda/$(version) lambda-$(version).zip && \
+	aws s3 cp lambda-$(version).zip s3://rockholla-terraform-aws-lambda-eks-apply/lambda-releases/lambda-$(version).zip;
 
 
 

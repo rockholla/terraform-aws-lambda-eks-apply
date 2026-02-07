@@ -54,11 +54,10 @@ locals {
 }
 
 resource "aws_secretsmanager_secret" "cluster_auth_secret" {
-  region = local.region
-
+  region                  = local.region
   description             = "Temporary EKS cluster auth token for ${local.cluster_name} cluster, for use by the Lambda EKS apply function"
   name_prefix             = local.cluster_token_secret_name_prefix
-  recovery_window_in_days = 30
+  recovery_window_in_days = 7
 }
 
 data "aws_iam_policy_document" "cluster_auth_secret" {
@@ -116,7 +115,7 @@ module "template_secrets" {
   region                  = local.region
   name_prefix             = "${each.key}-"
   description             = "Secret for ${each.key} in the Lambda to apply a rendered manifest to the EKS cluster ${local.cluster_name}"
-  recovery_window_in_days = 30
+  recovery_window_in_days = 7
   secret_string           = var.template_secrets[each.key]
 
   create_policy       = true
@@ -137,24 +136,24 @@ locals {
 }
 
 locals {
-  lambda_package_download_location = coalesce(var.lambda_package_download.path, path.cwd)
-  lambda_package_download_filename = coalesce(var.lambda_package_download.name, "lambda-${var.lambda_package_version}")
+  lambda_function_name  = "${local.cluster_name}-apply-manifest"
+  lambda_package_s3_key = "lambda-${var.lambda_package_version}.zip"
 }
 
-resource "utility_file_downloader" "lambda_release" {
-  url      = "https://github.com/rockholla/terraform-aws-lambda-eks-apply/releases/download/lambda%2F${var.lambda_package_version}/lambda-${var.lambda_package_version}.zip"
-  filename = "${local.lambda_package_download_location}/${local.lambda_package_download_filename}.zip"
-
-  headers = {
-    Accept = "application/vnd.github+json"
-  }
+resource "aws_s3_bucket" "lambda_package" {
+  region        = local.region
+  bucket_prefix = substr(local.cluster_name, 0, 37)
 }
 
-locals {
-  lambda_function_name = "${local.cluster_name}-${local.region}-apply-manifest"
+resource "aws_s3_object_copy" "lambda_package" {
+  region = local.region
+  bucket = aws_s3_bucket.lambda_package.id
+  key    = local.lambda_package_s3_key
+  source = "rockholla-terraform-aws-lambda-eks-apply/lambda-releases/${local.lambda_package_s3_key}"
 }
 
 resource "aws_cloudwatch_log_group" "manifest_apply" {
+  region            = local.region
   name              = "/aws/lambda/${local.lambda_function_name}"
   retention_in_days = 5
 }
@@ -164,7 +163,8 @@ resource "aws_lambda_function" "manifest_apply" {
   function_name = local.lambda_function_name
   timeout       = var.lambda_function_timeout
   architectures = ["x86_64"]
-  filename      = utility_file_downloader.lambda_release.filename
+  s3_bucket     = aws_s3_bucket.lambda_package.id
+  s3_key        = local.lambda_package_s3_key
   runtime       = "python3.14"
   handler       = "main.handler"
 
@@ -176,7 +176,10 @@ resource "aws_lambda_function" "manifest_apply" {
     system_log_level      = "WARN"
   }
 
-  depends_on = [aws_cloudwatch_log_group.manifest_apply]
+  depends_on = [
+    aws_cloudwatch_log_group.manifest_apply,
+    aws_s3_object_copy.lambda_package
+  ]
 }
 
 resource "aws_lambda_invocation" "manifest_apply" {
@@ -187,7 +190,7 @@ resource "aws_lambda_invocation" "manifest_apply" {
 
   lifecycle {
     postcondition {
-      condition     = jsondecode(self.result).statusCode == 200
+      condition     = jsondecode(self.result).statusCode == 200 || !var.fail_on_apply_errors
       error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
     }
     replace_triggered_by = [

@@ -61,31 +61,31 @@ module "eks" {
   subnet_ids = concat(module.vpc[each.key].private_subnets, module.vpc[each.key].public_subnets)
 }
 
-data "aws_eks_cluster_auth" "cluster" {
-  for_each = toset(var.supported_regions)
-  region   = each.key
-  name     = module.eks[each.key].cluster_name
-}
+# data "aws_eks_cluster_auth" "cluster" {
+#   for_each = toset(var.supported_regions)
+#   region   = each.key
+#   name     = module.eks[each.key].cluster_name
+# }
 
-module "lambda_eks_apply" {
-  for_each = toset(var.supported_regions)
-  source   = "../../"
+# module "lambda_eks_apply" {
+#   for_each = toset(var.supported_regions)
+#   source   = "../../"
 
-  region = each.key
-  eks_cluster = {
-    name                = module.eks[each.key].cluster_name
-    ca_certificate_data = module.eks[each.key].cluster_certificate_authority_data
-    endpoint            = module.eks[each.key].cluster_endpoint
-    token               = data.aws_eks_cluster_auth.cluster[each.key].token
-  }
-  k8s_manifest_template = file("${path.module}/manifest.tmpl.yaml")
-  template_data = {
-    nginx_deployment_name  = "test-deployment"
-    nginx_deployment_image = "nginx:1.29"
-  }
-  template_secrets = {
-    deployment_secret = "bXktc2VjcmV0Cg=="
-  }
-  force_apply = var.force_apply
-}
+#   region = each.key
+#   eks_cluster = {
+#     name                = module.eks[each.key].cluster_name
+#     ca_certificate_data = module.eks[each.key].cluster_certificate_authority_data
+#     endpoint            = module.eks[each.key].cluster_endpoint
+#     token               = data.aws_eks_cluster_auth.cluster[each.key].token
+#   }
+#   k8s_manifest_template = file("${path.module}/manifest.tmpl.yaml")
+#   template_data = {
+#     nginx_deployment_name  = "test-deployment"
+#     nginx_deployment_image = "nginx:1.29"
+#   }
+#   template_secrets = {
+#     deployment_secret = "bXktc2VjcmV0Cg=="
+#   }
+#   force_apply = var.force_apply
+# }
 
