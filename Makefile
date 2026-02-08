@@ -3,6 +3,8 @@ OPS_CONTAINER_NAME := terraform-aws-lambda-eks-apply-ops-container
 OPS_CONTAINER_RESET ?= false
 export
 
+SHELL = bash
+
 .PHONY: test
 test: lambda-test module-test
 
@@ -12,7 +14,7 @@ lambda-test:
 
 .PHONY: module-test
 module-test: ops-container
-	docker exec -i $(OPS_CONTAINER_NAME) /bin/bash -c "tfswitch && terraform init -reconfigure && terraform validate"
+	docker exec -i $(OPS_CONTAINER_NAME) /bin/bash -c "tfswitch && terraform fmt -check -recursive && terraform init -reconfigure && terraform validate"
 
 .PHONY: docs
 docs: ops-container

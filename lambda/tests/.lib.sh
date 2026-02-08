@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-export TEST_FUNCTION_CONTAINER_PORT=9000
+export TEST_FUNCTION_CONTAINER_PORT=9005
 export TEST_EXPECT_FAILURE=true
 export TEST_FAILED_MSG_PREFIX="==> TEST FAILED: "
 export YQ_VERSION="4.52.2"
@@ -26,16 +26,16 @@ function yq_local() {
 
 function ensure_kind_local() {
   mkdir -p "${_this_dir}/.bin"
-  info "Ensuring on-demand versions of dependencies are available for tests..."
+  info "Ensuring local version of kind available for tests..."
   if [[ ! -f "${_this_dir}/.bin/kind" ]] || [[ "v$("${_this_dir}"/.bin/kind --version | awk '{print $NF}')" != "${KIND_VERSION}" ]]; then
     if [[ "$(uname -s)" == "Darwin" ]]; then
       [ "$(uname -m)" = "x86_64" ] && curl -Lo "${_this_dir}/.bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-darwin-amd64"
       [ "$(uname -m)" = "arm64" ] && curl -Lo "${_this_dir}/.bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-darwin-arm64"
-      chmod +x ./.bin/kind
+      chmod +x "${_this_dir}"/.bin/kind
     elif [[ "$(uname -s)" == "Linux" ]]; then
       [ "$(uname -m)" = "x86_64" ] && curl -Lo "${_this_dir}/.bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
       [ "$(uname -m)" = "aarch64" ] && curl -Lo "${_this_dir}/.bin/kind" "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-arm64"
-      chmod +x ./.bin/kind
+      chmod +x "${_this_dir}"/.bin/kind
     else
       err "Unsupported system type $(uname -s) for running kind for these tests"
     fi
@@ -95,6 +95,8 @@ function test_invoke_lambda_function() {
   local inputs="$1"
   local expect_failure="${2:-false}"
   local failed_invoke=false
+  inputs="$(echo "$inputs" | yq_local -c)"
+  info "Invoking lambda function with inputs: ${inputs}"
   invoke_result="$(curl -s -XPOST "http://localhost:${TEST_FUNCTION_CONTAINER_PORT}/2015-03-31/functions/function/invocations" -d "${inputs}")"
   status_code="$(echo "$invoke_result" | yq -r '.statusCode // ""')"
   if [[ "$status_code" != 200 ]] ; then
