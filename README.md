@@ -1,6 +1,8 @@
 <!-- BEGIN_TF_DOCS -->
 # AWS Lambda EKS Apply Terraform Module
 
+[![ci](https://github.com/rockholla/terraform-aws-lambda-eks-apply/actions/workflows/main.yml/badge.svg)](https://github.com/rockholla/terraform-aws-lambda-eks-apply/actions/workflows/main.yml)
+
 This module wraps up some functionality to dynamically apply Kubernetes templated manifests to an EKS cluster via normal Terraform provisioning flows.
 
 We will build out these docs as we move forward, but see the [example directory](./examples/) for usage in the meantime.
