@@ -13,7 +13,7 @@ We will build out these docs as we move forward, but see the [example directory]
 * [A provider exists to address this problem](https://github.com/jmorris0x0/terraform-provider-k8sconnect)
 * But maybe we don't need a full provider, just this module for specific needs like EKS
 
-> [!WARN]
+> [!WARNING]
 > This module is not meant to install complex workloads or other resources into Kubernetes. Keep using other tools for that. **This is primarily meant to be used for bootstrapping chicken/egg type resources into your cluster so you can have the other deployment tools take over from there.**
 
 
