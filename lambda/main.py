@@ -49,11 +49,16 @@ def handler(event, _context):
       rendered_manifest = template.render(event)
       rendered_manifest_file.write(rendered_manifest)
     logger.info("Applying the rendered manifest")
+    additional_kubectl_args = []
     kubectl_operation = "apply"
     if 'kubectl_operation' in event:
       kubectl_operation = event['kubectl_operation']
+    if kubectl_operation == "delete":
+      additional_kubectl_args.append("--ignore-not-found")
+    kubectl_cmd = ['./kubectl', '--kubeconfig', kubeconfig_path, kubectl_operation, '-f', rendered_file_path]
+    kubectl_cmd.extend(additional_kubectl_args)
     kubectl_result = subprocess.run(
-      ['./kubectl', '--kubeconfig', kubeconfig_path, kubectl_operation, '-f', rendered_file_path],
+      kubectl_cmd,
       stdout=subprocess.PIPE,
       stderr=subprocess.STDOUT,
       text=True,

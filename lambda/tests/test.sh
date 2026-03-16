@@ -98,3 +98,22 @@ assert_contains "$result" 'deleted'
 echo ""
 handle_errors "exit 1"
 info "All tests passed!"
+
+###################### kubectl delete (when does not exist) ######################
+start_test_section "basic-templated delete (when resources do not exist)"
+inputs=$(cat <<EOT
+{
+  "cluster_ca_certificate_data":"${cluster_ca_certificate_data}",
+  "cluster_endpoint":"${cluster_endpoint}",
+  "cluster_token_secret_name":"${auth_token}",
+  "manifest_template_base64":"$(cat ./.fixtures/basic-templated.yml | base64)",
+  "namespace":"test-namespace-03",
+  "kubectl_operation":"delete"
+}
+EOT
+)
+result="$(test_invoke_lambda_function "$inputs")"
+
+echo ""
+handle_errors "exit 1"
+info "All tests passed!"
