@@ -5,7 +5,7 @@ locals {
   cluster_name                     = nonsensitive(var.eks_cluster.name)
   cluster_token_secret_name_prefix = "${local.cluster_name}-lambda-eks-apply-token-"
   template_secrets_keys            = nonsensitive(keys(var.template_secrets))
-  apply_trigger                    = var.force_apply || var.delete_manifest ? timestamp() : base64encode("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
+  apply_trigger                    = var.force_apply ? timestamp() : md5("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
 }
 
 resource "terraform_data" "apply_trigger" {
