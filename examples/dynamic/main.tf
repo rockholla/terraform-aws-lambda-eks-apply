@@ -65,6 +65,8 @@ data "aws_eks_cluster_auth" "cluster" {
   for_each = toset(var.supported_regions)
   region   = each.key
   name     = module.eks[each.key].cluster_name
+
+  depends_on = [module.eks]
 }
 
 module "lambda_eks_apply" {
