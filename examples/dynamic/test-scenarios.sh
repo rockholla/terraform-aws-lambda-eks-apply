@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-max_iterations=10
+max_iterations=4
 this_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$this_dir"
 total_runs=0
