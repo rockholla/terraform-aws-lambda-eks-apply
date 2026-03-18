@@ -72,4 +72,5 @@ We will build out these docs as we move forward, but see the [example directory]
 | Name | Description |
 |------|-------------|
 | <a name="output_invocation_log"></a> [invocation\_log](#output\_invocation\_log) | Log of the Lambda invocation execution |
+| <a name="output_lambda_role_arn"></a> [lambda\_role\_arn](#output\_lambda\_role\_arn) | ARN of the IAM role used by the Lambda function |
 <!-- END_TF_DOCS -->
