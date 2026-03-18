@@ -195,12 +195,15 @@ resource "aws_lambda_invocation" "manifest_apply" {
   input = jsonencode(local.template_data)
 
   lifecycle {
-    postcondition {
-      condition     = jsondecode(self.result).statusCode == 200 || !var.fail_on_apply_errors
-      error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
-    }
     replace_triggered_by = [
       terraform_data.apply_trigger
     ]
+  }
+}
+
+check "manifest_apply_result" {
+  assert {
+    condition     = jsondecode(aws_lambda_invocation.manifest_apply.result).statusCode == 200 || !var.fail_on_apply_errors
+    error_message = "Lambda function invocation failed, full inputs to the function: ${nonsensitive(jsonencode(local.template_data))}"
   }
 }
