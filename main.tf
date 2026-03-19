@@ -6,6 +6,10 @@ locals {
   cluster_token_secret_name_prefix = "${local.cluster_name}-lambda-eks-apply-token-"
   template_secrets_keys            = nonsensitive(keys(var.template_secrets))
   apply_trigger                    = var.force_apply ? timestamp() : md5("${jsonencode(local.template_data)}${var.k8s_manifest_template}")
+  iam_role_name_suffix             = "-apply-manifest-lambda"
+  iam_role_name_prefix             = substr("${local.cluster_name}-${local.region}", 0, 64 - length(local.iam_role_name_suffix)) # ensure that our full IAM role name never exceeds 64 characters
+  lambda_name_suffix               = "-apply-manifest"
+  lambda_name_prefix               = substr(local.cluster_name, 0, 64 - length(local.lambda_name_suffix)) # ensure that our full Lambda function name never exceeds 64 characters
 }
 
 resource "terraform_data" "apply_trigger" {
@@ -25,7 +29,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name        = "${local.cluster_name}-${local.region}-apply-manifest-lambda"
+  name        = "${local.iam_role_name_prefix}${local.iam_role_name_suffix}"
   description = "Role w/ permissions execute the Lambda to apply manifests to the EKS cluster ${local.cluster_name}"
 
   assume_role_policy    = data.aws_iam_policy_document.lambda_assume_role.json
@@ -137,7 +141,7 @@ locals {
 }
 
 locals {
-  lambda_function_name  = "${local.cluster_name}-apply-manifest"
+  lambda_function_name  = "${local.lambda_name_prefix}${local.lambda_name_suffix}"
   lambda_package_s3_key = "lambda-${var.lambda_package_version}.zip"
 }
 
